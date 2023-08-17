@@ -8,26 +8,6 @@ Supervisors are specialized processes that monitor other processes (called child
 
 **Exercise 1**: Implementing a Supervisor for BankAccount
 
-1. Create a Supervisor Module: Define a supervisor that will manage BankAccount processes.
-
-```
-defmodule BankSupervisor do
-  use Supervisor
-
-  def start_link(_) do
-    Supervisor.start_link(__MODULE__, :ok, name: :bank_supervisor)
-  end
-
-  def init(:ok) do
-    children = [
-      {BankAccount, 1000} # Example child specification
-    ]
-    Supervisor.init(children, strategy: :one_for_one)
-  end
-end
-```
-2. Modify the BankAccount Module: Ensure that the BankAccount module is suitable for supervision.
-
 **Exercise 1A**: Implement the BankSupervisor.
 
 * Step 1: Modify the BankAccount Module
