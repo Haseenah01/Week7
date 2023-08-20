@@ -8,6 +8,26 @@ Supervisors are specialized processes that monitor other processes (called child
 
 **Exercise 1**: Implementing a Supervisor for BankAccount
 
+1. Create a Supervisor Module: Define a supervisor that will manage BankAccount processes.
+
+```
+defmodule BankSupervisor do
+  use Supervisor
+
+  def start_link(_) do
+    Supervisor.start_link(__MODULE__, :ok, name: :bank_supervisor)
+  end
+
+  def init(:ok) do
+    children = [
+      {BankAccount, 1000} # Example child specification
+    ]
+    Supervisor.init(children, strategy: :one_for_one)
+  end
+end
+```
+2. Modify the BankAccount Module: Ensure that the BankAccount module is suitable for supervision.
+
 **Exercise 1A**: Implement the BankSupervisor.
 
 * Step 1: Modify the BankAccount Module
@@ -97,7 +117,6 @@ BankAccount.start_link("ACC456", 500)
 First, create a new module named BankRegistry that will act as the registry for bank accounts.
 ```
 defmodule BankRegistry do
-  use Registry
 
   def start_link do
     Registry.start_link(keys: :unique, name: BankRegistry)
@@ -111,11 +130,32 @@ This module uses Elixir's built-in Registry module, specifying that keys (in our
 Next, update the BankAccount module's start_link function to register each new bank account with a unique account number in the BankRegistry.
 ```
 defmodule BankAccount do
+alias BankRegistry
   # ... existing code ...
 
-  def start_link(account_number, initial_balance) do
-    GenServer.start_link(__MODULE__, initial_balance, name: {:via, Registry, {BankRegistry, account_number}})
+  defp via_tuple(account_number) do
+    {:via, Registry, {BankRegistry, account_number}}
   end
+
+  def start_link(account_number, initial_balance) do
+    GenServer.start_link(__MODULE__, initial_balance, name: via_tuple(account_number))
+  end
+
+  def deposit(number, amount) do
+    Logger.info("Request to deposit #{amount} received.")
+    number |> via_tuple() |> GenServer.cast({:deposit, amount})
+  end
+
+  def withdraw(number, amount) do
+    #account =  Registry.lookup(BankRegistry, account_number)
+    Logger.info("Request to withdraw #{amount} received.")
+    number |> via_tuple() |> GenServer.call({:withdraw, amount})
+  end
+
+  def balance(number) do
+  Logger.info("Request to retrieve balance received.")
+  number |> via_tuple() |> GenServer.call(:balance)
+   end
 
   # ... rest of the code ...
 end
@@ -176,12 +216,9 @@ The above implementation is a good start, but it lacks proper error handling. If
 Here's an enhanced version of the transfer function:
 ```
 def transfer(from_account, to_account, amount) do
-  from_account_pid = Registry.lookup(BankRegistry, from_account) |> List.first()
-  to_account_pid = Registry.lookup(BankRegistry, to_account) |> List.first()
-
-  case BankAccount.withdraw(from_account_pid, amount) do
+  case BankAccount.withdraw(from_account, amount) do
     {:ok, _} ->
-      case BankAccount.deposit(to_account_pid, amount) do
+      case BankAccount.deposit(to_account, amount) do
         {:ok, _} -> {:ok, "Transfer successful"}
         error -> error
       end
